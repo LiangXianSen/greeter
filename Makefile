@@ -1,31 +1,34 @@
-GO=go
+GO 		:= go
+ID      := greeter
+REPO    := github.com/LiangXianSen/$(ID)
+VERSION := v0.0.1
+SRC 	:= $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+PKG 	:= $(shell go list ./...|grep -v /vendor/)
+TARGET 	:= client server
 
-SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+# === This section provides application running utility === #
+.PHONY: all build clean check lint test benchmark
 
-TARGET = client server
-
-project = github.com/LiangXianSen/greeter
-packages := $(shell go list ./...|grep -v /vendor/)
-
-.PHONY: check test lint
-
-all: check build
+all: build
 
 build: $(TARGET)
 
 $(TARGET): $(SRC)
-	@$(GO) build $(project)/cmd/$@
+	@$(GO) build $(REPO)/cmd/$@
 
 test: check
-	@$(GO) test -race $(packages) -v -coverprofile=.coverage.out
+	@$(GO) test -race $(PKG) -v -coverprofile=.coverage.out
 	@$(GO) tool cover -func=.coverage.out
 	@rm -f .coverage.out
 
+benchmark: check
+	@$(GO) test -benchmem -bench=. -count=3 $(PKG)
+
 check:
-	@$(GO) vet -composites=false $(packages)
+	@$(GO) vet -composites=false $(PKG)
 
 lint:
-	@golint -set_exit_status $(packages)
+	@golint -set_exit_status $(PKG)
 
 lint-runner:
 	@golangci-lint run ./...
