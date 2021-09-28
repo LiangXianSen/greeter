@@ -6,9 +6,5 @@
     "grpc_endpoint": {
         "address": "0.0.0.0",
         "port": 8080
-    },
-    "metric_endpoint": {
-        "address": "0.0.0.0",
-        "port": 8088
     }
 }

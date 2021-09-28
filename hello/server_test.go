@@ -21,5 +21,16 @@ func TestMain(m *testing.M) {
 	if testSrv, err = NewServer(config); err != nil {
 		log.Fatalf("get hello service instance failed: %s", err)
 	}
+
+	go func() {
+		if err := testSrv.ServeGRPC(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	testSrv.IsGRPCReady()
+
 	os.Exit(m.Run())
+
+	// teardown
+	testSrv.Shutdown()
 }

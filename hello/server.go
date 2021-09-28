@@ -2,11 +2,13 @@ package hello
 
 import (
 	"context"
+	"log"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
@@ -27,33 +29,52 @@ func NewServer(conf *Config, opt ...Option) (srv *Server, err error) {
 		exit:    make(chan struct{}),
 	}
 
-	// grpc
-	md := srv.middlewareChain()
-	grpcServer := grpc.NewServer(md)
-	srv.grpcSrv = grpcServer
-	api.RegisterGreeterServer(grpcServer, srv)
+	srv.grpcSrv = srv.newGRPCService()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	// http gateway
-	mux := runtime.NewServeMux()
-	if err = api.RegisterGreeterHandlerServer(ctx, mux, srv); err != nil {
+	if srv.httpSrv, err = srv.newHTTPGateway(); err != nil {
 		return
 	}
-	listener := &http.Server{
+	return
+}
+
+func (srv *Server) newGRPCService() *grpc.Server {
+	md := srv.middlewareChain()
+	grpcServer := grpc.NewServer(md)
+	api.RegisterGreeterServer(grpcServer, srv)
+
+	return grpcServer
+}
+
+func (srv *Server) newHTTPGateway() (gateway *http.Server, err error) {
+	var conn *grpc.ClientConn
+	if conn, err = grpc.Dial(
+		srv.config.GRPCEndpoint.String(),
+		grpc.WithInsecure(),
+	); err != nil {
+		return
+	}
+
+	mux := runtime.NewServeMux()
+	if err = api.RegisterGreeterHandler(context.Background(), mux, conn); err != nil {
+		return
+	}
+	gateway = &http.Server{
 		Handler: mux,
 		Addr:    srv.config.HTTPEndpoint.String(),
 	}
-	srv.httpSrv = listener
 
-	return srv, nil
+	// metrics
+	mux.HandlePath("GET", "/metrics", metricsHandler)
+	return
+}
+
+func metricsHandler(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	promhttp.Handler().ServeHTTP(w, r)
 }
 
 // ServeHTTP serves HTTP endpoint.
 func (srv *Server) ServeHTTP() (err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	ctx := context.Background()
 
 	go func() {
 		<-srv.exit
@@ -62,6 +83,7 @@ func (srv *Server) ServeHTTP() (err error) {
 	}()
 
 	srv.sg.Add(1)
+	log.Printf("HTTP service listen on :%d", srv.config.HTTPEndpoint.Port)
 	return srv.httpSrv.ListenAndServe()
 }
 
@@ -79,6 +101,7 @@ func (srv *Server) ServeGRPC() (err error) {
 	}()
 
 	srv.sg.Add(1)
+	log.Printf("GRPC service listen on :%d", srv.config.GRPCEndpoint.Port)
 	return srv.grpcSrv.Serve(lis)
 }
 
@@ -91,4 +114,34 @@ func (srv *Server) Shutdown() {
 // SetLoggerLevel sets logger level.
 func (srv *Server) SetLoggerLevel(level zapcore.Level) {
 	srv.config.Logger.Level.SetLevel(level)
+}
+
+// IsGRPCReady checks the GRPC socket status.
+func (srv *Server) IsGRPCReady() bool {
+	var i, limit = 0, 10
+	for i = 0; i < limit; i++ {
+		conn, err := net.Dial("tcp", srv.config.GRPCEndpoint.String())
+		if err != nil {
+			time.Sleep(time.Second * 1)
+			continue
+		}
+		conn.Close()
+		break
+	}
+	return true && i < limit
+}
+
+// IsHTTPReady checks HTTP socket status.
+func (srv *Server) IsHTTPReady() bool {
+	var i, limit = 0, 10
+	for i = 0; i < limit; i++ {
+		conn, err := net.Dial("tcp", srv.config.HTTPEndpoint.String())
+		if err != nil {
+			time.Sleep(time.Second * 1)
+			continue
+		}
+		conn.Close()
+		break
+	}
+	return true && i < limit
 }

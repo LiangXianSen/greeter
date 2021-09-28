@@ -50,8 +50,14 @@ func TestMain(m *testing.M) {
 			log.Fatal(err)
 		}
 	}()
+	
+	srv.IsGRPCReady()
+	srv.IsHTTPReady()
 
 	os.Exit(m.Run())
+
+	// teardown
+	srv.Shutdown()
 }
 
 func TestHelloGRPC(t *testing.T) {

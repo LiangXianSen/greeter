@@ -17,7 +17,7 @@ $(TARGET): $(SRC)
 	@$(GO) build $(REPO)/cmd/$@
 
 test: check
-	@$(GO) test -race $(PKG) -v -coverprofile=.coverage.out
+	@$(GO) test -race $(PKG) -v -p 1 -coverprofile=.coverage.out
 	@$(GO) tool cover -func=.coverage.out
 	@rm -f .coverage.out
 

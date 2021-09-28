@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.5.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0

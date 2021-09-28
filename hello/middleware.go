@@ -4,6 +4,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
+	grpc_prometheus "github.com/LiangXianSen/greeter/prometheus"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
@@ -20,6 +21,7 @@ func (srv *Server) middlewareChain() grpc.ServerOption {
 	return grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 		grpc_recovery.UnaryServerInterceptor(srv.options.recoveryOpts...),
 		grpc_zap.UnaryServerInterceptor(logger, srv.options.zapOpts...),
+		grpc_prometheus.UnaryServerInterceptor(),
 	))
 }
 
